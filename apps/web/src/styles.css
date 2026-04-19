@@ -115,6 +115,44 @@ input[type="color"] {
   flex-shrink: 0;
 }
 
+.brand-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-panel > *:not(.brand-watermark) {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.brand-mark {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 1.05rem;
+  object-fit: cover;
+  box-shadow: 0 0 24px rgba(255, 107, 53, 0.28);
+  flex: 0 0 auto;
+}
+
+.brand-watermark {
+  position: absolute;
+  right: -2.2rem;
+  top: -2.8rem;
+  width: 10.5rem;
+  height: 10.5rem;
+  object-fit: cover;
+  opacity: 0.13;
+  filter: blur(0.4px) saturate(1.2);
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
 .brand-panel h1 {
   margin: 0.25rem 0 0.05rem;
   font-size: 1.5rem;

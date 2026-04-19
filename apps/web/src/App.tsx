@@ -33,6 +33,7 @@ import {
   stopPlayback,
   uploadProject
 } from "./api";
+import appIcon from "./assets/nanoleaf-jazz-icon-256.png";
 import { deleteProject, listProjects, loadRecentPaints, saveProject, saveRecentPaints } from "./storage";
 
 type ToolMode = "paint" | "erase" | "sample" | "select";
@@ -832,7 +833,11 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="panel brand-panel">
-          <p className="eyebrow">Nanoleaf Jazz</p>
+          <img className="brand-watermark" src={appIcon} alt="" aria-hidden="true" />
+          <div className="brand-heading">
+            <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
+            <p className="eyebrow">Nanoleaf Jazz</p>
+          </div>
           <h1>Frame-by-frame light choreography for Nanoleaf panels.</h1>
         </div>
 
