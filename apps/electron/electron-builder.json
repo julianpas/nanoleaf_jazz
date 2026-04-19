@@ -16,18 +16,23 @@
     }
   ],
   "win": {
+    "icon": "icon.ico",
     "target": [
-      "nsis",
-      "zip"
+      "nsis"
     ]
   },
+  "nsis": {
+    "installerIcon": "icon.ico",
+    "uninstallerIcon": "icon.ico"
+  },
   "mac": {
+    "icon": "icon.icns",
     "target": [
-      "dmg",
-      "zip"
+      "dmg"
     ]
   },
   "linux": {
+    "icon": "icons",
     "executableName": "nanoleaf-jazz",
     "artifactName": "nanoleaf-jazz-${version}-${arch}.${ext}",
     "maintainer": "Julian Pastarmov <julian@pastarmov.net>",

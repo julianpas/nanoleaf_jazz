@@ -5,6 +5,7 @@ dist/
 apps/*/dist/
 packages/*/dist/
 release/
+artifacts/
 .vite/
 coverage/
 
