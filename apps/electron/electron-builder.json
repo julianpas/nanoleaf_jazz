@@ -28,9 +28,16 @@
     ]
   },
   "linux": {
+    "executableName": "nanoleaf-jazz",
+    "artifactName": "nanoleaf-jazz-${version}-${arch}.${ext}",
+    "maintainer": "Julian Pastarmov <julian@pastarmov.net>",
     "target": [
       "AppImage",
       "deb"
     ]
+  },
+  "deb": {
+    "packageName": "nanoleaf-jazz",
+    "artifactName": "nanoleaf-jazz-${version}-${arch}.${ext}"
   }
 }

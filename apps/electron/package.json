@@ -2,7 +2,11 @@
   "name": "@nanoleaf-jazz/electron",
   "version": "0.1.0",
   "description": "Desktop shell for Nanoleaf Jazz.",
-  "author": "Nanoleaf Jazz",
+  "homepage": "https://github.com/julianpas/nanoleaf_jazz",
+  "author": {
+    "name": "Julian Pastarmov",
+    "email": "julian@pastarmov.net"
+  },
   "private": true,
   "type": "module",
   "main": "dist/main.cjs",
