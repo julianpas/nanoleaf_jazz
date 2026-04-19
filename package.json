@@ -1,0 +1,29 @@
+{
+  "name": "nanoleaf-jazz",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm --workspace @nanoleaf-jazz/shared run build",
+    "dev": "concurrently -n bridge,web -c blue,yellow \"npm run dev:bridge\" \"npm run dev:web\"",
+    "dev:bridge": "npm --workspace @nanoleaf-jazz/bridge run dev",
+    "dev:web": "npm --workspace @nanoleaf-jazz/web run dev",
+    "build": "npm --workspace @nanoleaf-jazz/shared run build && npm --workspace @nanoleaf-jazz/bridge run build && npm --workspace @nanoleaf-jazz/web run build",
+    "build:packages": "npm run build && npm --workspace @nanoleaf-jazz/browser-launcher run build && npm --workspace @nanoleaf-jazz/electron run build",
+    "release:browser": "npm run build && npm --workspace @nanoleaf-jazz/browser-launcher run release",
+    "release:electron": "npm run build && npm --workspace @nanoleaf-jazz/electron run release",
+    "release": "npm run release:browser && npm run release:electron",
+    "typecheck": "npm --workspace @nanoleaf-jazz/shared run typecheck && npm --workspace @nanoleaf-jazz/shared run build && npm --workspace @nanoleaf-jazz/bridge run typecheck && npm --workspace @nanoleaf-jazz/web run typecheck"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.17.0",
+    "concurrently": "^9.1.2",
+    "electron": "^41.2.1",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.8.3"
+  }
+}

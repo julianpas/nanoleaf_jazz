@@ -1,0 +1,13 @@
+{
+  "name": "@nanoleaf-jazz/electron",
+  "version": "0.1.0",
+  "description": "Desktop shell for Nanoleaf Jazz.",
+  "author": "Nanoleaf Jazz",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --external:electron --outfile=dist/main.cjs",
+    "release": "npm run build && electron-builder --config electron-builder.json --publish=never"
+  }
+}

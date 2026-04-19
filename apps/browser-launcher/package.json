@@ -1,0 +1,11 @@
+{
+  "name": "@nanoleaf-jazz/browser-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/main.cjs",
+    "release": "npm run build && node ../../scripts/release-browser-launcher.mjs",
+    "start": "node dist/main.cjs"
+  }
+}

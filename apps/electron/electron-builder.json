@@ -1,0 +1,36 @@
+{
+  "appId": "com.nanoleafjazz.app",
+  "productName": "Nanoleaf Jazz",
+  "electronVersion": "41.2.1",
+  "directories": {
+    "output": "../../release/electron"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "../web/dist",
+      "to": "web"
+    }
+  ],
+  "win": {
+    "target": [
+      "nsis",
+      "zip"
+    ]
+  },
+  "mac": {
+    "target": [
+      "dmg",
+      "zip"
+    ]
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "deb"
+    ]
+  }
+}

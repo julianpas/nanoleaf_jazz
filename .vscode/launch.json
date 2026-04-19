@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bridge: Debug",
+      "type": "pwa-node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm.cmd",
+      "runtimeArgs": [
+        "run",
+        "dev:bridge"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Web: Edge",
+      "type": "pwa-msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/apps/web/src",
+      "preLaunchTask": "dev:web"
+    },
+    {
+      "name": "Web: Chrome",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/apps/web/src",
+      "preLaunchTask": "dev:web"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Bridge + Edge",
+      "configurations": [
+        "Bridge: Debug",
+        "Web: Edge"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: Bridge + Chrome",
+      "configurations": [
+        "Bridge: Debug",
+        "Web: Chrome"
+      ],
+      "stopAll": true
+    }
+  ]
+}
+
