@@ -115,15 +115,38 @@ React UI -> /api -> local Fastify bridge -> Nanoleaf controller on LAN
 
 Main responsibilities:
 
-- `apps/web`: editor state, layout rendering, timeline UI, local project storage, import/export.
-- `apps/bridge`: discovery, manual device registration, pairing, layout fetch, preview, playback, upload.
-- `packages/shared`: project schema, layout hashing, migration/normalization, color helpers.
+- `apps/web`: editor state, layout rendering, timeline UI, local project storage, import/export, device-effect library, and device power controls.
+- `apps/bridge`: discovery, manual device registration, pairing, power control, layout fetch, preview, playback, device-effect import, and upload.
+- `packages/shared`: project schema, layout hashing, migration/normalization, timing helpers, and color helpers.
 - `apps/electron`: desktop shell around the built web UI and local bridge.
 - `apps/browser-launcher`: starts the bridge and opens the built web UI in the default browser.
+
+## Current Editing Model
+
+The editor remains frame-based, but timing is now split into project defaults plus optional per-frame overrides.
+
+- `AnimationProject.frameDurationMs` and `AnimationProject.transitionTimeMs` define the default timing.
+- `AnimationFrame.frameDurationMs` and `AnimationFrame.transitionTimeMs` are optional overrides for the selected frame only.
+- Shared helpers resolve effective timing for playback, preview, timeline labels, upload serialization, and imported device effects.
+
+This matters when changing the project schema or Nanoleaf conversion logic: playback and upload should always use the resolved frame timing rather than assuming one global interval.
+
+## Device Effects
+
+The bridge can read existing effects from the Nanoleaf controller and expose them to the web app library.
+
+- `requestAll` is used to list saved device effects.
+- `request` is used to fetch one effect definition for import.
+- Custom `animData` effects are converted into `AnimationProject` instances.
+- Plugin or other non-frame-based effects are surfaced as library entries but marked unsupported for editing.
+
+Imported custom effects preserve per-frame timing where the underlying Nanoleaf effect data can be mapped into the editor model.
 
 ## Persistence
 
 Project data and recent paints are stored in IndexedDB inside the web app.
+
+Device effects are not copied into IndexedDB automatically. Loading a device effect imports it into the live editor state, and saving it is still an explicit user action.
 
 Device pairing/config data is stored by the bridge under the current user's `.nanoleaf-jazz` config folder. This keeps API tokens local to the machine and outside exported project files.
 

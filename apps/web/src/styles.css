@@ -245,11 +245,35 @@ input[type="color"] {
   gap: 0.18rem;
 }
 
+.connected-device-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .connected-device-summary strong,
 .connected-device-summary .device-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.power-button {
+  min-width: 42px;
+  width: 42px;
+  padding: 0.48rem;
+}
+
+.power-button.on {
+  color: #bdf7d8;
+  border-color: rgba(97, 219, 157, 0.22);
+  background: rgba(97, 219, 157, 0.08);
+}
+
+.power-button.off {
+  color: #ffc4c4;
+  border-color: rgba(255, 116, 116, 0.22);
+  background: rgba(255, 116, 116, 0.08);
 }
 
 .orientation-controls {
@@ -459,6 +483,32 @@ input[type="color"] {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.timing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.timing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.timing-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.timing-reset-button {
+  min-width: 42px;
+  width: 42px;
+  padding: 0.48rem;
 }
 
 .canvas-panel {
@@ -706,6 +756,81 @@ label {
   max-height: 16vh;
 }
 
+.library-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.library-group + .library-group {
+  margin-top: 0.9rem;
+}
+
+.library-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.library-entry.active {
+  border-color: rgba(255, 107, 53, 0.34);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.library-entry.unsupported {
+  opacity: 0.82;
+}
+
+.library-entry-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.library-entry-title {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  transform: none;
+}
+
+.library-entry-title:hover {
+  border-color: transparent;
+  background: transparent;
+  transform: none;
+}
+
+.library-entry-title:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.library-entry-meta {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.library-entry-note {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.device-pill.active-effect {
+  background: rgba(255, 214, 128, 0.16);
+  color: #ffe5a8;
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -714,5 +839,9 @@ label {
   .device-list,
   .project-list {
     max-height: none;
+  }
+
+  .timing-grid {
+    grid-template-columns: 1fr;
   }
 }

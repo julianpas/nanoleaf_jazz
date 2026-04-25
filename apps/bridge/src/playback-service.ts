@@ -1,14 +1,16 @@
 import type {
   DeviceLayout,
   AnimationProject,
+  AnimationFrame,
   NanoleafDevice,
   PlaybackState
 } from "@nanoleaf-jazz/shared";
-import { fillFrameWithPanelIds } from "@nanoleaf-jazz/shared";
+import { fillFrameWithPanelIds, getFrameDurationMs, getFrameTransitionTimeMs } from "@nanoleaf-jazz/shared";
 import { displayFrame, getSelectedEffect, selectEffect } from "./nanoleaf-client.js";
 
 type ActivePlayback = {
-  timer: NodeJS.Timeout;
+  session: symbol;
+  timer?: NodeJS.Timeout;
   state: PlaybackState;
   previousEffect?: string;
 };
@@ -29,19 +31,47 @@ export class PlaybackService {
     await this.stop(device, token);
 
     const previousEffect = await getSelectedEffect(device, token);
+    const session = Symbol("playback");
     let frameIndex = 0;
-    const intervalMs = Math.max(16, Math.round(project.frameDurationMs));
     const panelIds = layout.panels.map((panel) => panel.panelId);
 
-    const tick = async () => {
-      const frame = project.frames[frameIndex];
-      if (!frame) {
+    this.activePlayback = {
+      session,
+      previousEffect,
+      state: {
+        active: true,
+        deviceId: device.id,
+        projectId: project.id,
+        frameIndex
+      }
+    };
+
+    const scheduleNext = (delayMs: number) => {
+      if (this.activePlayback?.session !== session) {
         return;
       }
 
-      await displayFrame(device, token, fillFrameWithPanelIds(frame, panelIds), project.transitionTimeMs);
+      this.activePlayback.timer = setTimeout(() => {
+        void tick();
+      }, delayMs);
+    };
+
+    const tick = async (): Promise<void> => {
+      const frame = project.frames[frameIndex];
+      if (!frame || this.activePlayback?.session !== session) {
+        return;
+      }
+
+      const transitionTimeMs = getFrameTransitionTimeMs(project, frame);
+      const frameDurationMs = getFrameDurationMs(project, frame);
+      await displayFrame(device, token, fillFrameWithPanelIds(frame, panelIds), transitionTimeMs);
+
+      if (this.activePlayback?.session !== session) {
+        return;
+      }
+
       this.activePlayback = {
-        timer,
+        ...this.activePlayback,
         previousEffect,
         state: {
           active: true,
@@ -51,11 +81,8 @@ export class PlaybackService {
         }
       };
       frameIndex = (frameIndex + 1) % project.frames.length;
-    };
-
-    const timer = setInterval(() => {
-      void tick();
-    }, intervalMs);
+      scheduleNext(frameDurationMs);
+    }
 
     await tick();
   }
@@ -66,7 +93,9 @@ export class PlaybackService {
       return;
     }
 
-    clearInterval(activePlayback.timer);
+    if (activePlayback.timer) {
+      clearTimeout(activePlayback.timer);
+    }
     this.activePlayback = undefined;
 
     if (device && token && activePlayback.previousEffect) {

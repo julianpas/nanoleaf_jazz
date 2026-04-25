@@ -67,6 +67,8 @@ chmod +x nanoleaf-jazz-electron-portable-linux.AppImage
 5. Put your Nanoleaf controller into pairing mode when the app asks for it (usually by pressing and holding the power button until it starts blinking).
 6. After pairing, the device stays available through the locally stored bridge config.
 
+Once a device is paired and reachable, the compact device header shows a power button you can use to turn the current controller on or off without leaving the app.
+
 Device pairing tokens are stored on your machine in your user profile under `.nanoleaf-jazz`.
 
 ## Editor Basics
@@ -95,16 +97,20 @@ Timeline controls:
 - `Add Frame`: append a new blank frame.
 - `Duplicate`: copy the selected frame.
 - `Move Left` and `Move Right`: reorder the selected frame.
-- Frame tiles include mini-previews so you can navigate long animations quickly.
+- Frame tiles include mini-previews and show the effective frame duration so you can navigate long animations quickly.
 
 ## Timing
 
 Animation timing is controlled in the Project section:
 
-- `Milliseconds Per Frame`: how long each frame is displayed.
-- `Transition Time`: how smoothly one frame fades into the next.
+- `Milliseconds Per Frame`: the default duration used by frames that do not override it.
+- `Transition Time`: the default fade time used by frames that do not override it.
+- `Current Frame`: each timing row includes a per-frame override field beside the default.
+- `Reset`: the small reset icon clears the current frame override and falls back to the project default again.
 
 Use `0 ms` transition time for hard cuts. Use a value below the frame duration for smoother fades.
+
+If you leave a current-frame timing field empty, that frame uses the default project timing. This makes it easy to keep most frames consistent and only adjust the few that need longer holds or faster transitions.
 
 ## Orientation
 
@@ -117,7 +123,7 @@ Use the Orientation controls to:
 
 These controls affect the editor preview mapping without changing the physical panel layout.
 
-## Save, Export, Import, Upload
+## Save, Import From Device, Export, Upload
 
 Project actions:
 
@@ -126,7 +132,17 @@ Project actions:
 - `Import`: loads a previously exported project JSON file.
 - `Upload`: creates a persistent custom effect on the connected Nanoleaf device.
 
-The Library section lists locally saved projects. Use the trash icon to delete a saved project.
+The Library section has two sources:
+
+- `Local Projects`: projects saved in the app. Use the trash icon to delete a saved project.
+- `Device Effects`: effects already stored on the paired Nanoleaf controller.
+
+Device effect notes:
+
+- Supported custom effects can be loaded into the editor and edited like normal Jazz projects.
+- The currently active device effect is marked in the library.
+- Some Nanoleaf effects are listed but not editable. This usually applies to plugin or motion-based effects that do not map cleanly to the frame-by-frame editor.
+- Use `Refresh` in the Library section if you uploaded an effect from another app or changed effects on the controller outside Nanoleaf Jazz.
 
 ## Troubleshooting
 
@@ -141,6 +157,12 @@ If preview or upload fails:
 - Reconnect the device from the Devices section.
 - Confirm the controller still has the same IP address.
 - Pair again if the Nanoleaf token was removed from the local config.
+
+If a device effect appears but cannot be loaded into the editor:
+
+- The effect may be a Nanoleaf plugin effect rather than a custom frame animation.
+- The effect may use timing or motion data that cannot be represented exactly in the current editor.
+- Try uploading a custom effect from Nanoleaf Jazz first and then reloading it from the Device Effects section.
 
 If the app layout looks mirrored or rotated:
 

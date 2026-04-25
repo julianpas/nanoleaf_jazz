@@ -6,6 +6,8 @@ import fastifyStatic from "@fastify/static";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   createDeviceId,
+  type DeviceEffectProjectResponse,
+  type DeviceEffectsResponse,
   fillFrameWithPanelIds,
   type AddManualDeviceInput,
   type HealthResponse,
@@ -13,6 +15,7 @@ import {
   type PairDeviceInput,
   type PlaybackFrameInput,
   type PlaybackStartInput,
+  type SetDevicePowerInput,
   type UploadProjectInput
 } from "@nanoleaf-jazz/shared";
 import { addManualDevice, clearToken, getManualDevices, getToken, saveToken } from "./config-store.js";
@@ -22,7 +25,10 @@ import {
   displayFrame,
   fetchDeviceInfo,
   fetchDeviceLayout,
+  listEffects,
+  loadEffectProject,
   probeDevicePort,
+  setDevicePower,
   uploadProjectEffect
 } from "./nanoleaf-client.js";
 import { PlaybackService } from "./playback-service.js";
@@ -142,6 +148,7 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
         name: info.name || device.name,
         model: info.model || device.model,
         firmwareVersion: info.firmwareVersion,
+        isOn: info.state?.on?.value,
         paired: true,
         reachable: true
       };
@@ -212,6 +219,7 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
         name: info.name || device.name,
         model: info.model || device.model,
         firmwareVersion: info.firmwareVersion,
+        isOn: info.state?.on?.value,
         paired: true,
         reachable: true
       };
@@ -220,6 +228,30 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
       return reply.code(400).send({
         message: "Pairing failed. Open the Nanoleaf pairing window and try again."
       });
+    }
+  });
+
+  server.post("/api/devices/:id/power", async (request, reply) => {
+    const params = request.params as { id: string };
+    const input = request.body as SetDevicePowerInput;
+
+    try {
+      const device = await findDevice(params.id);
+      const token = await getToken(device.id);
+
+      if (!token) {
+        return reply.code(401).send({ message: "Device is not paired" });
+      }
+
+      if (!(await probeDevicePort(device))) {
+        return reply.code(503).send({ message: "Device is not reachable on the local network" });
+      }
+
+      await setDevicePower(device, token, Boolean(input?.on));
+      return { ok: true };
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ message: "Unable to change device power" });
     }
   });
 
@@ -244,6 +276,54 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
       return reply.code(500).send({ message: "Unable to fetch layout" });
     }
   });
+
+  server.get("/api/devices/:id/effects", async (request, reply): Promise<DeviceEffectsResponse | FastifyReply> => {
+    const params = request.params as { id: string };
+
+    try {
+      const device = await findDevice(params.id);
+      const token = await getToken(device.id);
+
+      if (!token) {
+        return reply.code(401).send({ message: "Device is not paired" });
+      }
+
+      if (!(await probeDevicePort(device))) {
+        return reply.code(503).send({ message: "Device is not reachable on the local network" });
+      }
+
+      return await listEffects(device, token);
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ message: "Unable to fetch device effects" });
+    }
+  });
+
+  server.get(
+    "/api/devices/:id/effects/:effectName/import",
+    async (request, reply): Promise<DeviceEffectProjectResponse | FastifyReply> => {
+      const params = request.params as { id: string; effectName: string };
+
+      try {
+        const device = await findDevice(params.id);
+        const token = await getToken(device.id);
+
+        if (!token) {
+          return reply.code(401).send({ message: "Device is not paired" });
+        }
+
+        if (!(await probeDevicePort(device))) {
+          return reply.code(503).send({ message: "Device is not reachable on the local network" });
+        }
+
+        const layout = await fetchDeviceLayout(device, token);
+        return await loadEffectProject(device, token, params.effectName, layout);
+      } catch (error) {
+        request.log.error(error);
+        return reply.code(500).send({ message: "Unable to load device effect" });
+      }
+    }
+  );
 
   server.post("/api/playback/frame", async (request, reply) => {
     const input = request.body as PlaybackFrameInput;

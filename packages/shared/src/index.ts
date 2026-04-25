@@ -31,6 +31,7 @@ export type NanoleafDevice = {
   port: number;
   model: string;
   firmwareVersion?: string;
+  isOn?: boolean;
   paired: boolean;
   reachable: boolean;
   source: DeviceSource;
@@ -40,6 +41,8 @@ export type NanoleafDevice = {
 export type AnimationFrame = {
   id: string;
   cells: Record<string, RgbColor>;
+  frameDurationMs?: number;
+  transitionTimeMs?: number;
 };
 
 export type AnimationProject = {
@@ -92,9 +95,34 @@ export type PlaybackStartInput = {
   project: AnimationProject;
 };
 
+export type SetDevicePowerInput = {
+  deviceId: string;
+  on: boolean;
+};
+
 export type UploadProjectInput = {
   deviceId: string;
   project: AnimationProject;
+};
+
+export type DeviceEffectSummary = {
+  name: string;
+  animType: string;
+  editable: boolean;
+  reason?: string;
+  pluginType?: string;
+  pluginUuid?: string;
+  isActive: boolean;
+};
+
+export type DeviceEffectsResponse = {
+  effects: DeviceEffectSummary[];
+  selectedEffectName?: string;
+};
+
+export type DeviceEffectProjectResponse = {
+  effect: DeviceEffectSummary;
+  project?: AnimationProject;
 };
 
 export function createDeviceId(host: string, port = 16021): string {
@@ -124,7 +152,9 @@ export function createEmptyFrame(): AnimationFrame {
 export function cloneFrame(frame: AnimationFrame): AnimationFrame {
   return {
     id: createId("frame"),
-    cells: structuredClone(frame.cells)
+    cells: structuredClone(frame.cells),
+    frameDurationMs: frame.frameDurationMs,
+    transitionTimeMs: frame.transitionTimeMs
   };
 }
 
@@ -183,8 +213,25 @@ export function normalizeProject(project: AnimationProject): AnimationProject {
     transitionTimeMs: project.transitionTimeMs ?? 100,
     viewRotation,
     viewMirrorX: rawViewMirrorY ? !rawViewMirrorX : rawViewMirrorX,
-    viewMirrorY: false
+    viewMirrorY: false,
+    frames: project.frames.map((frame) => ({
+      ...frame,
+      frameDurationMs:
+        frame.frameDurationMs == null ? undefined : Math.max(16, Math.min(60000, Math.round(frame.frameDurationMs))),
+      transitionTimeMs:
+        frame.transitionTimeMs == null ? undefined : Math.max(0, Math.min(60000, Math.round(frame.transitionTimeMs)))
+    }))
   };
+}
+
+export function getFrameDurationMs(project: AnimationProject, frame: AnimationFrame): number {
+  const durationMs = frame.frameDurationMs ?? project.frameDurationMs;
+  return Math.max(16, Math.min(60000, Math.round(durationMs)));
+}
+
+export function getFrameTransitionTimeMs(project: AnimationProject, frame: AnimationFrame): number {
+  const transitionTimeMs = frame.transitionTimeMs ?? project.transitionTimeMs;
+  return Math.max(0, Math.min(getFrameDurationMs(project, frame), Math.round(transitionTimeMs)));
 }
 
 export function updateProjectTimestamp(project: AnimationProject): AnimationProject {

@@ -2,9 +2,13 @@ import net from "node:net";
 import {
   applyBrightness,
   createColor,
+  createProject,
+  getFrameDurationMs,
+  getFrameTransitionTimeMs,
   inferPanelShape,
   type AnimationFrame,
   type AnimationProject,
+  type DeviceEffectSummary,
   type DeviceLayout,
   type NanoleafDevice
 } from "@nanoleaf-jazz/shared";
@@ -13,6 +17,11 @@ type DeviceInfoResponse = {
   name: string;
   model: string;
   firmwareVersion?: string;
+  state?: {
+    on?: {
+      value?: boolean;
+    };
+  };
 };
 
 type RawLayoutResponse = {
@@ -43,6 +52,41 @@ type EffectWritePayload = {
   palette?: unknown[];
 };
 
+type NanoleafEffect = {
+  animName: string;
+  animType: string;
+  animData?: string | null;
+  loop?: boolean;
+  version?: string;
+  palette?: unknown[];
+  pluginType?: string;
+  pluginUuid?: string;
+  pluginOptions?: Array<{
+    name: string;
+    value: unknown;
+  }>;
+  colorType?: string;
+};
+
+type EffectListResponse = {
+  animations?: NanoleafEffect[];
+};
+
+type ParsedAnimStep = {
+  cells: Record<string, ReturnType<typeof createColor>>;
+  durationMs: number;
+};
+
+type ParsedCustomAnimData =
+  | {
+      ok: true;
+      steps: ParsedAnimStep[];
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
 function buildBaseUrl(device: Pick<NanoleafDevice, "host" | "port">, token?: string): string {
   const root = `http://${device.host}:${device.port}`;
   if (!token) {
@@ -68,6 +112,19 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function parseBody<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw new Error(`Nanoleaf request failed with ${response.status} ${response.statusText}`);
+  }
+
+  const text = await response.text();
+  if (!text.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
 function toTransitionTimeUnits(durationMs: number): number {
   return Math.max(0, Math.round(durationMs / 100));
 }
@@ -89,6 +146,271 @@ function putEffectCommand(
   });
 }
 
+function summarizeEffect(
+  effect: NanoleafEffect,
+  selectedEffectName?: string,
+  parsedCustomEffect?: ParsedCustomAnimData
+): DeviceEffectSummary {
+  const customParse = effect.animType === "custom" ? parsedCustomEffect ?? parseCustomAnimData(effect.animData) : undefined;
+
+  if (effect.animType === "custom") {
+    return {
+      name: effect.animName,
+      animType: effect.animType,
+      editable: customParse?.ok ?? false,
+      reason: customParse?.ok ? undefined : customParse?.reason ?? "Custom effect data is missing.",
+      isActive: selectedEffectName === effect.animName
+    };
+  }
+
+  if (effect.animType === "plugin") {
+    return {
+      name: effect.animName,
+      animType: effect.animType,
+      editable: false,
+      reason: "Plugin effects use Nanoleaf motions, which the frame editor cannot round-trip.",
+      pluginType: effect.pluginType,
+      pluginUuid: effect.pluginUuid,
+      isActive: selectedEffectName === effect.animName
+    };
+  }
+
+  return {
+    name: effect.animName,
+    animType: effect.animType,
+    editable: false,
+    reason: `Unsupported effect type: ${effect.animType}`,
+    pluginType: effect.pluginType,
+    pluginUuid: effect.pluginUuid,
+    isActive: selectedEffectName === effect.animName
+  };
+}
+
+function colorsEqual(
+  left: Record<string, ReturnType<typeof createColor>>,
+  right: Record<string, ReturnType<typeof createColor>>
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftColor = left[key];
+    const rightColor = right[key];
+    if (!rightColor) {
+      return false;
+    }
+
+    if (
+      leftColor.r !== rightColor.r ||
+      leftColor.g !== rightColor.g ||
+      leftColor.b !== rightColor.b ||
+      leftColor.brightness !== rightColor.brightness
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function parseCustomAnimData(animData?: string | null): ParsedCustomAnimData {
+  if (!animData?.trim()) {
+    return {
+      ok: false,
+      reason: "Custom effect data is missing."
+    };
+  }
+
+  const tokens = animData.trim().split(/\s+/);
+  let cursor = 0;
+  const readNumber = () => {
+    const value = Number.parseInt(tokens[cursor] ?? "", 10);
+    cursor += 1;
+    return value;
+  };
+
+  const numPanels = readNumber();
+  if (!Number.isFinite(numPanels) || numPanels <= 0) {
+    return {
+      ok: false,
+      reason: "Custom effect header is invalid."
+    };
+  }
+
+  const perPanel: Array<{
+    panelId: number;
+    frames: Array<{
+      color: ReturnType<typeof createColor>;
+      durationMs: number;
+    }>;
+  }> = [];
+
+  for (let panelIndex = 0; panelIndex < numPanels; panelIndex += 1) {
+    const panelId = readNumber();
+    const numFrames = readNumber();
+    if (!Number.isFinite(panelId) || !Number.isFinite(numFrames) || numFrames < 0) {
+      return {
+        ok: false,
+        reason: "Custom effect panel data is invalid."
+      };
+    }
+
+    const frames: Array<{
+      color: ReturnType<typeof createColor>;
+      durationMs: number;
+    }> = [];
+
+    for (let frameIndex = 0; frameIndex < numFrames; frameIndex += 1) {
+      const r = readNumber();
+      const g = readNumber();
+      const b = readNumber();
+      const _w = readNumber();
+      const transitionUnits = readNumber();
+      if ([r, g, b, transitionUnits].some((value) => !Number.isFinite(value))) {
+        return {
+          ok: false,
+          reason: "Custom effect color frame data is invalid."
+        };
+      }
+
+      frames.push({
+        color: createColor({
+          r: Math.max(0, Math.min(255, r)),
+          g: Math.max(0, Math.min(255, g)),
+          b: Math.max(0, Math.min(255, b)),
+          brightness: 100
+        }),
+        durationMs: Math.max(0, transitionUnits) * 100
+      });
+    }
+
+    perPanel.push({
+      panelId,
+      frames
+    });
+  }
+
+  if (cursor !== tokens.length) {
+    return {
+      ok: false,
+      reason: "Custom effect data has unexpected trailing tokens."
+    };
+  }
+
+  const stepCount = perPanel[0]?.frames.length ?? 0;
+  if (stepCount === 0) {
+    return {
+      ok: false,
+      reason: "Custom effect contains no frames."
+    };
+  }
+
+  if (!perPanel.every((panel) => panel.frames.length === stepCount)) {
+    return {
+      ok: false,
+      reason: "Panels use different frame counts, which the current editor cannot represent."
+    };
+  }
+
+  const steps: ParsedAnimStep[] = [];
+  for (let stepIndex = 0; stepIndex < stepCount; stepIndex += 1) {
+    const durationMs = perPanel[0]?.frames[stepIndex]?.durationMs ?? 0;
+    if (!perPanel.every((panel) => panel.frames[stepIndex]?.durationMs === durationMs)) {
+      return {
+        ok: false,
+        reason: "Panels use different transition timings, which the current editor cannot represent."
+      };
+    }
+
+    const cells: ParsedAnimStep["cells"] = {};
+    for (const panel of perPanel) {
+      const frame = panel.frames[stepIndex];
+      if (!frame) {
+        return {
+          ok: false,
+          reason: "Custom effect frame data is incomplete."
+        };
+      }
+
+      cells[String(panel.panelId)] = frame.color;
+    }
+
+    steps.push({
+      cells,
+      durationMs
+    });
+  }
+
+  return {
+    ok: true,
+    steps
+  };
+}
+
+function toProjectFromEffect(
+  device: Pick<NanoleafDevice, "id" | "model" | "name">,
+  layout: DeviceLayout,
+  effect: NanoleafEffect
+): AnimationProject {
+  const parsed = parseCustomAnimData(effect.animData);
+  if (!parsed.ok) {
+    throw new Error(parsed.reason);
+  }
+
+  let steps = parsed.steps;
+  let importedTransitions = steps.map((step) => step.durationMs);
+  let importedDurations = steps.map((step) => Math.max(step.durationMs, 100));
+
+  const pairwiseRepeat =
+    steps.length >= 2 &&
+    steps.length % 2 === 0 &&
+    steps.every((step, index) => {
+      if (index % 2 === 1) {
+        return true;
+      }
+
+      const holdStep = steps[index + 1];
+      return Boolean(holdStep) && colorsEqual(step.cells, holdStep.cells);
+    });
+
+  if (pairwiseRepeat) {
+    const transitionDurations = steps.filter((_, index) => index % 2 === 0).map((step) => step.durationMs);
+    const holdDurations = steps.filter((_, index) => index % 2 === 1).map((step) => step.durationMs);
+    importedTransitions = transitionDurations;
+    importedDurations = transitionDurations.map((duration, index) => duration + (holdDurations[index] ?? 0));
+    steps = steps.filter((_, index) => index % 2 === 0);
+  } else {
+    importedTransitions = steps.map(() => 0);
+    importedDurations = steps.map((step) => step.durationMs);
+  }
+
+  const defaultFrameDurationMs = Math.max(100, importedDurations[0] ?? 100);
+  const defaultTransitionTimeMs = Math.min(importedTransitions[0] ?? 0, defaultFrameDurationMs);
+
+  const project = createProject({
+    name: effect.animName,
+    deviceId: device.id,
+    deviceModel: device.model,
+    layout,
+    frameDurationMs: defaultFrameDurationMs
+  });
+
+  return {
+    ...project,
+    name: effect.animName,
+    transitionTimeMs: defaultTransitionTimeMs,
+    frames: steps.map((step, index) => ({
+      id: `frame_import_${index}`,
+      cells: structuredClone(step.cells),
+      frameDurationMs: importedDurations[index] === defaultFrameDurationMs ? undefined : importedDurations[index],
+      transitionTimeMs: importedTransitions[index] === defaultTransitionTimeMs ? undefined : importedTransitions[index]
+    }))
+  };
+}
+
 export async function createAuthToken(device: Pick<NanoleafDevice, "host" | "port">): Promise<string> {
   const response = await fetch(`${buildBaseUrl(device)}/new`, {
     method: "POST",
@@ -106,6 +428,27 @@ export async function fetchDeviceInfo(
     signal: withTimeout(3000)
   });
   return parseResponse<DeviceInfoResponse>(response);
+}
+
+export async function setDevicePower(
+  device: Pick<NanoleafDevice, "host" | "port">,
+  token: string,
+  on: boolean
+): Promise<void> {
+  const response = await fetch(`${buildBaseUrl(device, token)}/state`, {
+    method: "PUT",
+    signal: withTimeout(3000),
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      on: {
+        value: on
+      }
+    })
+  });
+
+  await parseResponse(response);
 }
 
 export async function fetchDeviceLayout(
@@ -153,6 +496,52 @@ export async function getSelectedEffect(
   }
 }
 
+export async function listEffects(
+  device: Pick<NanoleafDevice, "host" | "port">,
+  token: string
+): Promise<{ effects: DeviceEffectSummary[]; selectedEffectName?: string }> {
+  const [response, selectedEffectName] = await Promise.all([
+    putEffectCommand(device, token, {
+      command: "requestAll"
+    }),
+    getSelectedEffect(device, token)
+  ]);
+  const payload = await parseBody<EffectListResponse>(response);
+  const effects = (payload?.animations ?? [])
+    .map((effect) => summarizeEffect(effect, selectedEffectName))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    effects,
+    selectedEffectName
+  };
+}
+
+export async function loadEffectProject(
+  device: Pick<NanoleafDevice, "id" | "name" | "model" | "host" | "port">,
+  token: string,
+  effectName: string,
+  layout: DeviceLayout
+): Promise<{ effect: DeviceEffectSummary; project?: AnimationProject }> {
+  const response = await putEffectCommand(device, token, {
+    command: "request",
+    animName: effectName
+  });
+  const effect = await parseBody<NanoleafEffect>(response);
+  const summary = summarizeEffect(effect);
+
+  if (!summary.editable) {
+    return {
+      effect: summary
+    };
+  }
+
+  return {
+    effect: summary,
+    project: toProjectFromEffect(device, layout, effect)
+  };
+}
+
 export async function selectEffect(
   device: Pick<NanoleafDevice, "host" | "port">,
   token: string,
@@ -194,22 +583,30 @@ function frameToAnimData(frame: AnimationFrame, transitionTimeMs: number): strin
 }
 
 function projectToAnimData(project: AnimationProject, layout: DeviceLayout): string {
-  const transitionTimeMs = Math.max(0, Math.min(project.transitionTimeMs, project.frameDurationMs));
-  const holdTimeMs = Math.max(0, project.frameDurationMs - transitionTimeMs);
-  const transitionUnits = toTransitionTimeUnits(transitionTimeMs);
-  const holdUnits = toTransitionTimeUnits(holdTimeMs);
-  const framesPerPanel = project.frames.length * (holdUnits > 0 ? 2 : 1);
+  const frameTimings = project.frames.map((frame) => {
+    const transitionTimeMs = getFrameTransitionTimeMs(project, frame);
+    const holdTimeMs = Math.max(0, getFrameDurationMs(project, frame) - transitionTimeMs);
+    return {
+      transitionUnits: toTransitionTimeUnits(transitionTimeMs),
+      holdUnits: toTransitionTimeUnits(holdTimeMs)
+    };
+  });
+  const framesPerPanel = frameTimings.reduce(
+    (total, timing) => total + (timing.holdUnits > 0 ? 2 : 1),
+    0
+  );
   const segments = [String(layout.panels.length)];
 
   for (const panel of layout.panels) {
     segments.push(String(panel.panelId), String(framesPerPanel));
 
-    for (const frame of project.frames) {
+    for (const [index, frame] of project.frames.entries()) {
+      const timing = frameTimings[index];
       const color = applyBrightness(frame.cells[String(panel.panelId)] ?? createColor({ brightness: 0 }));
-      segments.push(String(color.r), String(color.g), String(color.b), "0", String(transitionUnits));
+      segments.push(String(color.r), String(color.g), String(color.b), "0", String(timing.transitionUnits));
 
-      if (holdUnits > 0) {
-        segments.push(String(color.r), String(color.g), String(color.b), "0", String(holdUnits));
+      if (timing.holdUnits > 0) {
+        segments.push(String(color.r), String(color.g), String(color.b), "0", String(timing.holdUnits));
       }
     }
   }

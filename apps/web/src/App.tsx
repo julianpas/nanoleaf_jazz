@@ -11,6 +11,9 @@ import {
   cloneFrame,
   createEmptyFrame,
   createProject,
+  getFrameDurationMs,
+  getFrameTransitionTimeMs,
+  type DeviceEffectSummary,
   hashLayout,
   hexToRgb,
   normalizeProject,
@@ -24,11 +27,14 @@ import {
 } from "@nanoleaf-jazz/shared";
 import {
   addManualDevice,
+  getDeviceEffects,
   getDevices,
   getHealth,
   getLayout,
+  importDeviceEffect,
   pairDevice,
   previewFrame,
+  setDevicePower,
   startPlayback,
   stopPlayback,
   uploadProject
@@ -254,6 +260,7 @@ export function App() {
   const [layout, setLayout] = useState<DeviceLayout | null>(null);
   const [project, setProject] = useState<AnimationProject | null>(null);
   const [savedProjects, setSavedProjects] = useState<AnimationProject[]>([]);
+  const [deviceEffects, setDeviceEffects] = useState<DeviceEffectSummary[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [selectedColor, setSelectedColor] = useState("#FF6B35");
   const [selectedBrightness, setSelectedBrightness] = useState(100);
@@ -265,8 +272,11 @@ export function App() {
   const [manualHost, setManualHost] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
+  const [isRefreshingDeviceEffects, setIsRefreshingDeviceEffects] = useState(false);
   const [isSubmittingManualHost, setIsSubmittingManualHost] = useState(false);
+  const [isImportingEffectName, setIsImportingEffectName] = useState<string | null>(null);
   const [isPairingDeviceId, setIsPairingDeviceId] = useState<string | null>(null);
+  const [isTogglingPower, setIsTogglingPower] = useState(false);
   const [isUploadingProject, setIsUploadingProject] = useState(false);
   const [isDevicePanelExpanded, setIsDevicePanelExpanded] = useState(false);
   const [hoveredPanelId, setHoveredPanelId] = useState<number | null>(null);
@@ -307,6 +317,15 @@ export function App() {
 
     void loadLayout(selectedDevice.id);
   }, [selectedDevice]);
+
+  useEffect(() => {
+    if (!selectedDevice?.paired || !selectedDevice.reachable) {
+      setDeviceEffects([]);
+      return;
+    }
+
+    void refreshDeviceEffects(selectedDevice.id);
+  }, [selectedDevice?.id, selectedDevice?.paired, selectedDevice?.reachable]);
 
   useEffect(() => {
     if (!isPaintPickerOpen) {
@@ -461,6 +480,19 @@ export function App() {
     setSavedProjects(nextProjects.map(coerceProject));
   }
 
+  async function refreshDeviceEffects(deviceId: string) {
+    try {
+      setIsRefreshingDeviceEffects(true);
+      const nextEffects = await getDeviceEffects(deviceId);
+      setDeviceEffects(nextEffects.effects);
+    } catch (error) {
+      setDeviceEffects([]);
+      setStatus((error as Error).message);
+    } finally {
+      setIsRefreshingDeviceEffects(false);
+    }
+  }
+
   async function refreshHealth() {
     try {
       const health = await getHealth();
@@ -545,6 +577,69 @@ export function App() {
       ...project,
       transitionTimeMs: coerceTransitionTimeMs(value)
     });
+  }
+
+  function setCurrentFrameDurationOverride(rawValue: string) {
+    if (!project || !currentFrame) {
+      return;
+    }
+
+    const nextProject = structuredClone(project);
+    const frame = nextProject.frames[currentFrameIndex];
+    if (!frame) {
+      return;
+    }
+
+    if (rawValue.trim() === "") {
+      frame.frameDurationMs = undefined;
+    } else {
+      const parsed = Number.parseInt(rawValue, 10);
+      if (Number.isNaN(parsed)) {
+        return;
+      }
+
+      frame.frameDurationMs = coerceFrameDurationMs(parsed);
+    }
+    updateProject(nextProject);
+  }
+
+  function setCurrentFrameTransitionOverride(rawValue: string) {
+    if (!project || !currentFrame) {
+      return;
+    }
+
+    const nextProject = structuredClone(project);
+    const frame = nextProject.frames[currentFrameIndex];
+    if (!frame) {
+      return;
+    }
+
+    if (rawValue.trim() === "") {
+      frame.transitionTimeMs = undefined;
+    } else {
+      const parsed = Number.parseInt(rawValue, 10);
+      if (Number.isNaN(parsed)) {
+        return;
+      }
+
+      frame.transitionTimeMs = coerceTransitionTimeMs(parsed);
+    }
+    updateProject(nextProject);
+  }
+
+  function resetCurrentFrameTiming(field: "frameDurationMs" | "transitionTimeMs") {
+    if (!project || !currentFrame) {
+      return;
+    }
+
+    const nextProject = structuredClone(project);
+    const frame = nextProject.frames[currentFrameIndex];
+    if (!frame) {
+      return;
+    }
+
+    delete frame[field];
+    updateProject(nextProject);
   }
 
   function paintPanel(frame: AnimationProject["frames"][number], panelId: number) {
@@ -670,12 +765,16 @@ export function App() {
   }
 
   function clearFrame() {
-    if (!project) {
+    if (!project || !currentFrame) {
       return;
     }
 
     const nextProject = structuredClone(project);
-    nextProject.frames[currentFrameIndex] = createEmptyFrame();
+    nextProject.frames[currentFrameIndex] = {
+      ...createEmptyFrame(),
+      frameDurationMs: currentFrame.frameDurationMs,
+      transitionTimeMs: currentFrame.transitionTimeMs
+    };
     updateProject(nextProject);
     setSelectedPanels([]);
   }
@@ -716,6 +815,7 @@ export function App() {
     try {
       setIsUploadingProject(true);
       const result = await uploadProject(selectedDevice.id, project);
+      await refreshDeviceEffects(selectedDevice.id);
       setStatus(`Uploaded "${result.effectName}" to ${selectedDevice.name}`);
     } catch (error) {
       setStatus((error as Error).message);
@@ -725,12 +825,12 @@ export function App() {
   }
 
   async function previewCurrentFrame() {
-    if (!selectedDevice || !currentFrame) {
+    if (!selectedDevice || !project || !currentFrame) {
       return;
     }
 
     try {
-      await previewFrame(selectedDevice.id, currentFrame, project?.transitionTimeMs);
+      await previewFrame(selectedDevice.id, currentFrame, getFrameTransitionTimeMs(project, currentFrame));
       setStatus(`Previewed frame ${currentFrameIndex + 1}`);
     } catch (error) {
       setStatus((error as Error).message);
@@ -765,6 +865,7 @@ export function App() {
       await refreshDevices();
       setSelectedDeviceId(deviceId);
       await loadLayout(deviceId);
+      await refreshDeviceEffects(deviceId);
       setIsDevicePanelExpanded(false);
     } catch (error) {
       setStatus((error as Error).message);
@@ -789,6 +890,48 @@ export function App() {
       setStatus((error as Error).message);
     } finally {
       setIsSubmittingManualHost(false);
+    }
+  }
+
+  async function toggleSelectedDevicePower() {
+    if (!selectedDevice || !selectedDevice.paired) {
+      return;
+    }
+
+    try {
+      setIsTogglingPower(true);
+      const nextOn = !selectedDevice.isOn;
+      await setDevicePower(selectedDevice.id, nextOn);
+      await refreshDevices();
+      setStatus(`${selectedDevice.name} turned ${nextOn ? "on" : "off"}`);
+    } catch (error) {
+      setStatus((error as Error).message);
+    } finally {
+      setIsTogglingPower(false);
+    }
+  }
+
+  async function loadDeviceEffect(effect: DeviceEffectSummary) {
+    if (!selectedDevice) {
+      return;
+    }
+
+    try {
+      setIsImportingEffectName(effect.name);
+      const result = await importDeviceEffect(selectedDevice.id, effect.name);
+
+      if (!result.project) {
+        setStatus(result.effect.reason ?? `Device effect "${effect.name}" cannot be edited here.`);
+        return;
+      }
+
+      setProject(coerceProject(result.project));
+      setCurrentFrameIndex(0);
+      setStatus(`Loaded device effect "${result.effect.name}" into the editor`);
+    } catch (error) {
+      setStatus((error as Error).message);
+    } finally {
+      setIsImportingEffectName(null);
     }
   }
 
@@ -863,7 +1006,18 @@ export function App() {
                   {selectedDevice.host}:{selectedDevice.port} | {selectedDevice.model || "paired"}
                 </span>
               </div>
-              <span className="device-pill ok">connected</span>
+              <div className="connected-device-actions">
+                <button
+                  type="button"
+                  className={`icon-button power-button ${selectedDevice.isOn === false ? "off" : "on"}`}
+                  onClick={() => void toggleSelectedDevicePower()}
+                  disabled={isTogglingPower}
+                  aria-label={selectedDevice.isOn === false ? "Turn device on" : "Turn device off"}
+                  title={selectedDevice.isOn === false ? "Turn on" : "Turn off"}
+                >
+                  <PowerIcon />
+                </button>
+              </div>
             </div>
           )}
           {(!hasConnectedDevice || isDevicePanelExpanded) && (
@@ -951,26 +1105,86 @@ export function App() {
               </label>
               <label>
                 Milliseconds Per Frame
-                <input
-                  type="number"
-                  min={16}
-                  max={60000}
-                  step={1}
-                  value={project.frameDurationMs}
-                  onChange={(event) => setFrameDurationMs(Number.parseInt(event.target.value || "83", 10))}
-                />
+                <div className="timing-grid">
+                  <div className="timing-field">
+                    <span className="muted compact-note">Default</span>
+                    <input
+                      type="number"
+                      min={16}
+                      max={60000}
+                      step={1}
+                      value={project.frameDurationMs}
+                      onChange={(event) => setFrameDurationMs(Number.parseInt(event.target.value || "83", 10))}
+                    />
+                  </div>
+                  <div className="timing-field">
+                    <span className="muted compact-note">Current Frame</span>
+                    <div className="timing-inline">
+                      <input
+                        type="number"
+                        min={16}
+                        max={60000}
+                        step={1}
+                        value={currentFrame?.frameDurationMs ?? ""}
+                        placeholder={String(project.frameDurationMs)}
+                        onChange={(event) => setCurrentFrameDurationOverride(event.target.value)}
+                        disabled={!currentFrame}
+                      />
+                      <button
+                        type="button"
+                        className="icon-button timing-reset-button"
+                        onClick={() => resetCurrentFrameTiming("frameDurationMs")}
+                        disabled={!currentFrame || currentFrame.frameDurationMs == null}
+                        aria-label="Reset current frame duration to default"
+                        title="Reset to default"
+                      >
+                        <ResetIcon />
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <span className="muted compact-note">Approx. {deriveFps(project.frameDurationMs)} fps</span>
               </label>
               <label>
                 Transition Time
-                <input
-                  type="number"
-                  min={0}
-                  max={60000}
-                  step={1}
-                  value={project.transitionTimeMs}
-                  onChange={(event) => setTransitionTimeMs(Number.parseInt(event.target.value || "0", 10))}
-                />
+                <div className="timing-grid">
+                  <div className="timing-field">
+                    <span className="muted compact-note">Default</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60000}
+                      step={1}
+                      value={project.transitionTimeMs}
+                      onChange={(event) => setTransitionTimeMs(Number.parseInt(event.target.value || "0", 10))}
+                    />
+                  </div>
+                  <div className="timing-field">
+                    <span className="muted compact-note">Current Frame</span>
+                    <div className="timing-inline">
+                      <input
+                        type="number"
+                        min={0}
+                        max={60000}
+                        step={1}
+                        value={currentFrame?.transitionTimeMs ?? ""}
+                        placeholder={String(project.transitionTimeMs)}
+                        onChange={(event) => setCurrentFrameTransitionOverride(event.target.value)}
+                        disabled={!currentFrame}
+                      />
+                      <button
+                        type="button"
+                        className="icon-button timing-reset-button"
+                        onClick={() => resetCurrentFrameTiming("transitionTimeMs")}
+                        disabled={!currentFrame || currentFrame.transitionTimeMs == null}
+                        aria-label="Reset current frame transition to default"
+                        title="Reset to default"
+                      >
+                        <ResetIcon />
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <span className="muted compact-note">
                   0 ms is abrupt; values near frame duration continuously fade.
                 </span>
@@ -1058,29 +1272,95 @@ export function App() {
         <div className="panel library-panel">
           <div className="section-heading">
             <h2>Library</h2>
+            <button
+              type="button"
+              onClick={() => selectedDevice && void refreshDeviceEffects(selectedDevice.id)}
+              disabled={!selectedDevice?.paired || isRefreshingDeviceEffects}
+            >
+              {isRefreshingDeviceEffects ? "Refreshing" : "Refresh"}
+            </button>
           </div>
-          <div className="project-list">
-            {savedProjects.map((item) => (
-              <div key={item.id} className="saved-project">
-                <label
-                  className="saved-project-title"
-                  onClick={() => {
-                    setProject(coerceProject(item));
-                    setCurrentFrameIndex(0);
-                  }}
-                >
-                  {item.name}
-                </label>
-                <button
-                  className="danger icon-button trash-button"
-                  onClick={() => void removeProject(item.id)}
-                  aria-label={`Delete ${item.name}`}
-                  title={`Delete ${item.name}`}
-                >
-                  <TrashIcon />
-                </button>
+          <div className="library-group">
+            <span className="form-section-label">Local Projects</span>
+            <div className="project-list">
+              {savedProjects.length > 0 ? (
+                savedProjects.map((item) => (
+                  <div key={item.id} className="saved-project">
+                    <label
+                      className="saved-project-title"
+                      onClick={() => {
+                        setProject(coerceProject(item));
+                        setCurrentFrameIndex(0);
+                      }}
+                    >
+                      {item.name}
+                    </label>
+                    <button
+                      className="danger icon-button trash-button"
+                      onClick={() => void removeProject(item.id)}
+                      aria-label={`Delete ${item.name}`}
+                      title={`Delete ${item.name}`}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <strong>No saved projects yet</strong>
+                  <span className="muted">Save a project to keep it in the local library.</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="library-group">
+            <span className="form-section-label">Device Effects</span>
+            {!selectedDevice?.paired ? (
+              <p className="muted">Pair a device to browse its saved effects.</p>
+            ) : deviceEffects.length > 0 ? (
+              <div className="project-list">
+                {deviceEffects.map((effect) => (
+                  <div
+                    key={effect.name}
+                    className={`library-entry ${effect.isActive ? "active" : ""} ${effect.editable ? "" : "unsupported"}`}
+                  >
+                    <div className="library-entry-copy">
+                      <button
+                        type="button"
+                        className="saved-project-title library-entry-title"
+                        onClick={() => void loadDeviceEffect(effect)}
+                        disabled={!effect.editable || isImportingEffectName === effect.name}
+                        title={
+                          effect.editable
+                            ? `Load ${effect.name} into the editor`
+                            : effect.reason ?? `${effect.name} cannot be edited here`
+                        }
+                      >
+                        {effect.name}
+                      </button>
+                      <div className="library-entry-meta">
+                        <span className="device-pill ok">{effect.animType}</span>
+                        {effect.pluginType ? <span className="muted compact-note">{effect.pluginType}</span> : null}
+                        {effect.isActive ? <span className="device-pill active-effect">Active</span> : null}
+                      </div>
+                      {effect.reason ? <span className="muted library-entry-note">{effect.reason}</span> : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadDeviceEffect(effect)}
+                      disabled={!effect.editable || isImportingEffectName === effect.name}
+                    >
+                      {isImportingEffectName === effect.name ? "Loading" : effect.editable ? "Load" : "View"}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="empty-state">
+                <strong>No device effects found</strong>
+                <span className="muted">Saved effects on the Nanoleaf controller will appear here.</span>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -1265,7 +1545,9 @@ export function App() {
                 />
                 <span className="timeline-frame-meta">
                   <span>F{index + 1}</span>
-                  <span>{Object.keys(frame.cells).length} lit</span>
+                  <span>
+                    {Object.keys(frame.cells).length} lit · {project ? getFrameDurationMs(project, frame) : 0} ms
+                  </span>
                 </span>
                 <span
                   className="timeline-delete"
@@ -1409,6 +1691,36 @@ function TrashIcon() {
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ResetIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M6 8V4m0 0h4M6 4l4 4m2-3a7 7 0 1 1-6 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PowerIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M8 5.8a7 7 0 1 0 8 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
     </svg>
   );

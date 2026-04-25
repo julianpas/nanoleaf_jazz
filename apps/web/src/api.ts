@@ -2,9 +2,12 @@ import type {
   AddManualDeviceInput,
   AnimationFrame,
   AnimationProject,
+  DeviceEffectProjectResponse,
+  DeviceEffectsResponse,
   DeviceLayout,
   HealthResponse,
-  NanoleafDevice
+  NanoleafDevice,
+  SetDevicePowerInput
 } from "@nanoleaf-jazz/shared";
 
 const API_ROOT = import.meta.env.VITE_API_ROOT ?? "/api";
@@ -52,8 +55,25 @@ export function pairDevice(deviceId: string) {
   });
 }
 
+export function setDevicePower(deviceId: string, on: boolean) {
+  return request<{ ok: true }>(`/devices/${encodeURIComponent(deviceId)}/power`, {
+    method: "POST",
+    body: JSON.stringify({ deviceId, on } satisfies SetDevicePowerInput)
+  });
+}
+
 export function getLayout(deviceId: string) {
   return request<DeviceLayout>(`/devices/${encodeURIComponent(deviceId)}/layout`);
+}
+
+export function getDeviceEffects(deviceId: string) {
+  return request<DeviceEffectsResponse>(`/devices/${encodeURIComponent(deviceId)}/effects`);
+}
+
+export function importDeviceEffect(deviceId: string, effectName: string) {
+  return request<DeviceEffectProjectResponse>(
+    `/devices/${encodeURIComponent(deviceId)}/effects/${encodeURIComponent(effectName)}/import`
+  );
 }
 
 export function previewFrame(deviceId: string, frame: AnimationFrame, transitionTimeMs?: number) {
