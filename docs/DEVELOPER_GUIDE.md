@@ -27,7 +27,7 @@ docs/
 
 ## Prerequisites
 
-- Node.js 22
+- Node.js 24
 - npm
 - A Nanoleaf panel device on the same LAN for real device testing
 
