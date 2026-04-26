@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nanoleaf Jazz | Frame-by-frame light choreography</title>
+    <meta
+      name="description"
+      content="Nanoleaf Jazz is a local-first animation editor for designing, previewing, and uploading frame-by-frame effects to Nanoleaf panel layouts."
+    />
+    <meta name="theme-color" content="#101314" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Nanoleaf Jazz" />
+    <meta
+      property="og:description"
+      content="Paint timeline-based animations, preview them live on your Nanoleaf panels, and upload custom effects from a desktop-friendly editor."
+    />
+    <meta property="og:image" content="https://julianpas.github.io/nanoleaf_jazz/nanoleaf_jazz.png" />
+    <meta property="og:url" content="https://julianpas.github.io/nanoleaf_jazz/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="nanoleaf-jazz-icon.png" />
+    <link rel="apple-touch-icon" href="nanoleaf-jazz-icon.png" />
+    <link rel="stylesheet" href="landing.css" />
+  </head>
+  <body>
+    <header class="site-header" aria-label="Primary navigation">
+      <a class="brand" href="index.html" aria-label="Nanoleaf Jazz home">
+        <img src="nanoleaf-jazz-icon.png" width="40" height="40" alt="" />
+        <span>Nanoleaf Jazz</span>
+      </a>
+      <nav class="nav-links" aria-label="Project links">
+        <a href="#features">Features</a>
+        <a href="USER_GUIDE.md">Guide</a>
+        <a href="https://github.com/julianpas/nanoleaf_jazz">GitHub</a>
+      </nav>
+      <a class="nav-cta" href="https://github.com/julianpas/nanoleaf_jazz/releases/latest">Download</a>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <img class="hero-bg" src="nanoleaf_jazz.png" alt="" fetchpriority="high" />
+        <div class="hero-shade" aria-hidden="true"></div>
+        <div class="hero-inner">
+          <p class="eyebrow">Local-first editor for Nanoleaf panels</p>
+          <h1 id="hero-title">Nanoleaf Jazz</h1>
+          <p class="hero-copy">
+            Paint frame-by-frame light animations on your real panel layout, preview them live across your LAN,
+            and upload polished custom effects to your Nanoleaf controller.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button button-primary" href="https://github.com/julianpas/nanoleaf_jazz/releases/latest">
+              Download latest
+            </a>
+            <a class="button button-secondary" href="USER_GUIDE.md">Read the guide</a>
+          </div>
+          <ul class="hero-proof" aria-label="Project highlights">
+            <li>Windows</li>
+            <li>macOS</li>
+            <li>Linux</li>
+            <li>Electron or browser launcher</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="intro" aria-label="Product summary">
+        <div>
+          <p class="section-kicker">Designed for real light layouts</p>
+          <h2>Build effects against the panels on your wall, not a generic grid.</h2>
+        </div>
+        <p>
+          Nanoleaf Jazz reads your controller layout, keeps your projects on your machine, and gives you timeline
+          controls for color, brightness, frame timing, transitions, orientation, import, export, and device effects.
+        </p>
+      </section>
+
+      <section id="features" class="feature-grid" aria-label="Core features">
+        <article class="feature-card">
+          <span class="feature-mark paint" aria-hidden="true"></span>
+          <h3>Paint the timeline</h3>
+          <p>
+            Create frames, duplicate beats, reorder moments, and tune frame duration or transition time where the
+            animation needs a hold, cut, or fade.
+          </p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-mark preview" aria-hidden="true"></span>
+          <h3>Preview live</h3>
+          <p>
+            Send one frame or loop the full animation to your Nanoleaf panels before committing the effect to the
+            controller.
+          </p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-mark local" aria-hidden="true"></span>
+          <h3>Stay local</h3>
+          <p>
+            Project files, recent paints, and pairing configuration stay on your machine. Export JSON when you want
+            a portable project file.
+          </p>
+        </article>
+      </section>
+
+      <section class="workflow" aria-labelledby="workflow-title">
+        <div class="workflow-copy">
+          <p class="section-kicker">From idea to installed effect</p>
+          <h2 id="workflow-title">A focused workflow for animation experiments that survive the session.</h2>
+          <p>
+            Start with a blank project or load a supported device effect, sketch color changes with recent paints
+            and fill tools, then upload the result as a persistent Nanoleaf effect.
+          </p>
+        </div>
+        <ol class="workflow-steps">
+          <li>
+            <strong>Pair</strong>
+            <span>Discover or add a controller on your LAN, then authorize once.</span>
+          </li>
+          <li>
+            <strong>Compose</strong>
+            <span>Paint panels, sample colors, select tiles, and adjust orientation.</span>
+          </li>
+          <li>
+            <strong>Ship</strong>
+            <span>Preview the loop, save locally, export JSON, or upload to the device.</span>
+          </li>
+        </ol>
+      </section>
+
+      <section class="download-band" aria-labelledby="download-title">
+        <div>
+          <p class="section-kicker">Ready when you are</p>
+          <h2 id="download-title">Grab a build and start with the panels you already own.</h2>
+          <p>
+            Releases include installers, portable Electron packages, and a lightweight browser launcher for desktop
+            workflows.
+          </p>
+        </div>
+        <div class="download-actions">
+          <a class="button button-primary" href="https://github.com/julianpas/nanoleaf_jazz/releases/latest">
+            View releases
+          </a>
+          <a class="button button-secondary light" href="DEVELOPER_GUIDE.md">Developer guide</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Nanoleaf Jazz</span>
+      <span>Local-first animation tooling for Nanoleaf panels.</span>
+      <a href="https://github.com/julianpas/nanoleaf_jazz">Source on GitHub</a>
+    </footer>
+  </body>
+</html>
