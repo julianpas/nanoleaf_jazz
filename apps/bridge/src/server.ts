@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   createDeviceId,
@@ -161,6 +162,12 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
       };
     }
   }
+
+  await server.register(rateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: "1 minute"
+  });
 
   server.get("/api/health", async (): Promise<HealthResponse> => ({
     ok: true,
