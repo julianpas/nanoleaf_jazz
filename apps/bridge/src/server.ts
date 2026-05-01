@@ -58,7 +58,7 @@ type StaticReply = FastifyReply & {
 
 const EXPENSIVE_ENDPOINT_RATE_LIMIT = {
   max: 10,
-  timeWindow: "1 second"
+  timeWindow: "1 minute"
 };
 
 function getDefaultWebDistCandidates(): string[] {
@@ -180,9 +180,7 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
   server.get(
     "/api/devices",
     {
-      config: {
-        rateLimit: EXPENSIVE_ENDPOINT_RATE_LIMIT
-      }
+      preHandler: server.rateLimit(EXPENSIVE_ENDPOINT_RATE_LIMIT)
     },
     async () => {
       const devices = await resolveDevices();
@@ -225,9 +223,7 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
   server.post(
     "/api/devices/:id/pair",
     {
-      config: {
-        rateLimit: EXPENSIVE_ENDPOINT_RATE_LIMIT
-      }
+      preHandler: server.rateLimit(EXPENSIVE_ENDPOINT_RATE_LIMIT)
     },
     async (request, reply) => {
       const params = request.params as { id: string };
