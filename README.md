@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/github-code-scanning/codeql"><img alt="CI" src="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/github-code-scanning/codeql/badge.svg" /></a>
   <a href="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/release.yml"><img alt="Release" src="https://github.com/julianpas/nanoleaf_jazz/actions/workflows/release.yml/badge.svg" /></a>
   <a href="https://github.com/julianpas/nanoleaf_jazz/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/julianpas/nanoleaf_jazz?include_prereleases" /></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f" />
