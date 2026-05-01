@@ -56,6 +56,11 @@ type StaticReply = FastifyReply & {
   sendFile: (filePath: string) => FastifyReply;
 };
 
+const EXPENSIVE_ENDPOINT_RATE_LIMIT = {
+  max: 10,
+  timeWindow: "1 second"
+};
+
 function getDefaultWebDistCandidates(): string[] {
   if (process.env.NANOLEAF_JAZZ_WEB_DIST) {
     return [process.env.NANOLEAF_JAZZ_WEB_DIST];
@@ -164,9 +169,7 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
   }
 
   await server.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: "1 minute"
+    global: false
   });
 
   server.get("/api/health", async (): Promise<HealthResponse> => ({
@@ -174,10 +177,18 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
     playback: playback.getState()
   }));
 
-  server.get("/api/devices", async () => {
-    const devices = await resolveDevices();
-    return Promise.all(devices.map((device) => hydrateDevice(device)));
-  });
+  server.get(
+    "/api/devices",
+    {
+      config: {
+        rateLimit: EXPENSIVE_ENDPOINT_RATE_LIMIT
+      }
+    },
+    async () => {
+      const devices = await resolveDevices();
+      return Promise.all(devices.map((device) => hydrateDevice(device)));
+    }
+  );
 
   server.post("/api/devices/manual", async (request, reply) => {
     const input = request.body as AddManualDeviceInput;
@@ -211,32 +222,40 @@ export async function createBridgeServer(options: BridgeServerOptions = {}): Pro
     };
   });
 
-  server.post("/api/devices/:id/pair", async (request, reply) => {
-    const params = request.params as { id: string };
-    const _input = request.body as PairDeviceInput | undefined;
+  server.post(
+    "/api/devices/:id/pair",
+    {
+      config: {
+        rateLimit: EXPENSIVE_ENDPOINT_RATE_LIMIT
+      }
+    },
+    async (request, reply) => {
+      const params = request.params as { id: string };
+      const _input = request.body as PairDeviceInput | undefined;
 
-    try {
-      const device = await findDevice(params.id);
-      const token = await createAuthToken(device);
-      await saveToken(device.id, token);
-      const info = await fetchDeviceInfo(device, token);
+      try {
+        const device = await findDevice(params.id);
+        const token = await createAuthToken(device);
+        await saveToken(device.id, token);
+        const info = await fetchDeviceInfo(device, token);
 
-      return {
-        ...device,
-        name: info.name || device.name,
-        model: info.model || device.model,
-        firmwareVersion: info.firmwareVersion,
-        isOn: info.state?.on?.value,
-        paired: true,
-        reachable: true
-      };
-    } catch (error) {
-      request.log.error(error);
-      return reply.code(400).send({
-        message: "Pairing failed. Open the Nanoleaf pairing window and try again."
-      });
+        return {
+          ...device,
+          name: info.name || device.name,
+          model: info.model || device.model,
+          firmwareVersion: info.firmwareVersion,
+          isOn: info.state?.on?.value,
+          paired: true,
+          reachable: true
+        };
+      } catch (error) {
+        request.log.error(error);
+        return reply.code(400).send({
+          message: "Pairing failed. Open the Nanoleaf pairing window and try again."
+        });
+      }
     }
-  });
+  );
 
   server.post("/api/devices/:id/power", async (request, reply) => {
     const params = request.params as { id: string };
