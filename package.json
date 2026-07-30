@@ -19,11 +19,11 @@
     "typecheck": "npm --workspace @nanoleaf-jazz/shared run typecheck && npm --workspace @nanoleaf-jazz/shared run build && npm --workspace @nanoleaf-jazz/bridge run typecheck && npm --workspace @nanoleaf-jazz/web run typecheck"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.17.0",
+    "@yao-pkg/pkg": "^6.21.0",
     "concurrently": "^9.2.4",
     "electron": "^41.2.1",
     "electron-builder": "^26.15.3",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.8.3"
   }
 }
