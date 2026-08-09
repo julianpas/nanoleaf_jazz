@@ -71,6 +71,18 @@
       }
     },
     {
+      "label": "build:electron",
+      "type": "shell",
+      "command": "npm.cmd run build && npm.cmd --workspace @nanoleaf-jazz/electron run build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
       "label": "typecheck",
       "type": "shell",
       "command": "npm.cmd run typecheck",

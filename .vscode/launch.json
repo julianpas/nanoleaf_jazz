@@ -17,6 +17,21 @@
       ]
     },
     {
+      "name": "Electron: Debug",
+      "type": "pwa-node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd",
+      "args": [
+        "${workspaceFolder}/apps/electron"
+      ],
+      "preLaunchTask": "build:electron",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
       "name": "Web: Edge",
       "type": "pwa-msedge",
       "request": "launch",
@@ -52,4 +67,3 @@
     }
   ]
 }
-

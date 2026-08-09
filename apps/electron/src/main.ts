@@ -30,10 +30,10 @@ async function createMainWindow() {
   });
 
   mainWindow = new BrowserWindow({
-    width: 1320,
-    height: 900,
-    minWidth: 960,
-    minHeight: 680,
+    width: 1387,
+    height: 979,
+    minWidth: 1366,
+    minHeight: 768,
     title: "Nanoleaf Jazz",
     backgroundColor: "#10131a",
     webPreferences: {

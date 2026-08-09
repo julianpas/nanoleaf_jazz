@@ -5,10 +5,17 @@ const DATABASE_VERSION = 2;
 const PROJECT_STORE_NAME = "projects";
 const SETTINGS_STORE_NAME = "settings";
 const RECENT_PAINTS_KEY = "recent-paints";
+const DEVICE_VIEW_KEY_PREFIX = "device-view:";
 
 export type StoredPaintSwatch = {
   color: string;
   brightness: number;
+};
+
+export type StoredDeviceView = {
+  rotation: number;
+  mirrorX: boolean;
+  mirrorY: boolean;
 };
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -84,6 +91,28 @@ export function saveRecentPaints(swatches: StoredPaintSwatch[]): Promise<void> {
     const request = store.put({
       key: RECENT_PAINTS_KEY,
       value: swatches
+    });
+    request.onsuccess = () => resolve(undefined);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export function loadDeviceView(deviceId: string): Promise<StoredDeviceView | null> {
+  return runTransaction(SETTINGS_STORE_NAME, "readonly", (store, resolve, reject) => {
+    const request = store.get(`${DEVICE_VIEW_KEY_PREFIX}${deviceId}`);
+    request.onsuccess = () => {
+      const result = request.result as { key: string; value?: StoredDeviceView } | undefined;
+      resolve(result?.value ?? null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export function saveDeviceView(deviceId: string, view: StoredDeviceView): Promise<void> {
+  return runTransaction(SETTINGS_STORE_NAME, "readwrite", (store, resolve, reject) => {
+    const request = store.put({
+      key: `${DEVICE_VIEW_KEY_PREFIX}${deviceId}`,
+      value: view
     });
     request.onsuccess = () => resolve(undefined);
     request.onerror = () => reject(request.error);

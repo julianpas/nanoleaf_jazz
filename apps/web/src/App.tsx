@@ -40,7 +40,16 @@ import {
   uploadProject
 } from "./api";
 import appIcon from "./assets/nanoleaf-jazz-icon-256.png";
-import { deleteProject, listProjects, loadRecentPaints, saveProject, saveRecentPaints } from "./storage";
+import {
+  deleteProject,
+  listProjects,
+  loadDeviceView,
+  loadRecentPaints,
+  saveDeviceView,
+  saveProject,
+  saveRecentPaints,
+  type StoredDeviceView
+} from "./storage";
 
 type ToolMode = "paint" | "erase" | "sample" | "select";
 
@@ -71,6 +80,11 @@ type RecentSwatch = {
 const EMPTY_COLOR: RgbColor = { r: 0, g: 0, b: 0, brightness: 100 };
 const DEGREE_STEP = 15;
 const RECENT_COLORS_KEY = "nanoleaf-jazz:recent-colors";
+const DEFAULT_DEVICE_VIEW: StoredDeviceView = {
+  rotation: 0,
+  mirrorX: true,
+  mirrorY: false
+};
 const DEFAULT_RECENT_SWATCHES: RecentSwatch[] = [
   { color: "#FF6B35", brightness: 100 },
   { color: "#F7B32B", brightness: 100 },
@@ -94,6 +108,16 @@ function rotatePoint(x: number, y: number, angleDegrees: number, centerX: number
     x: centerX + dx * cos - dy * sin,
     y: centerY + dx * sin + dy * cos
   };
+}
+
+function getPanelLabelTransform(
+  panelOrientation: number,
+  viewRotation: number,
+  viewMirrorX: boolean,
+  viewMirrorY: boolean
+) {
+  // Cancel the panel and canvas transforms so IDs are always screen-horizontal and readable.
+  return `rotate(${-panelOrientation - viewRotation}) scale(${viewMirrorX ? -1 : 1} ${viewMirrorY ? -1 : 1})`;
 }
 
 function getShapeMetrics(layout: DeviceLayout): ShapeMetrics {
@@ -281,6 +305,7 @@ export function App() {
   const [isDevicePanelExpanded, setIsDevicePanelExpanded] = useState(false);
   const [hoveredPanelId, setHoveredPanelId] = useState<number | null>(null);
   const [isPaintPickerOpen, setIsPaintPickerOpen] = useState(false);
+  const [deviceView, setDeviceView] = useState<StoredDeviceView>(DEFAULT_DEVICE_VIEW);
   const paintPickerRef = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const pickerStartRef = useRef<RecentSwatch>({
@@ -292,9 +317,9 @@ export function App() {
   const hasConnectedDevice = Boolean(selectedDevice?.paired && selectedDevice.reachable);
   const currentFrame = project?.frames[currentFrameIndex] ?? null;
   const frameCells = currentFrame?.cells ?? {};
-  const viewRotation = project?.viewRotation ?? 0;
-  const viewMirrorX = project?.viewMirrorX ?? true;
-  const viewMirrorY = project?.viewMirrorY ?? false;
+  const viewRotation = deviceView.rotation;
+  const viewMirrorX = deviceView.mirrorX;
+  const viewMirrorY = deviceView.mirrorY;
 
   useEffect(() => {
     void refreshRecentSwatches();
@@ -317,6 +342,35 @@ export function App() {
 
     void loadLayout(selectedDevice.id);
   }, [selectedDevice]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!selectedDeviceId) {
+      setDeviceView(DEFAULT_DEVICE_VIEW);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setDeviceView(DEFAULT_DEVICE_VIEW);
+    void loadDeviceView(selectedDeviceId)
+      .then((savedView) => {
+        if (isCurrent) {
+          setDeviceView(savedView ?? DEFAULT_DEVICE_VIEW);
+        }
+      })
+      .catch((error) => {
+        if (isCurrent) {
+          setDeviceView(DEFAULT_DEVICE_VIEW);
+          setStatus(`Device orientation storage unavailable: ${(error as Error).message}`);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedDeviceId]);
 
   useEffect(() => {
     if (!selectedDevice?.paired || !selectedDevice.reachable) {
@@ -533,25 +587,30 @@ export function App() {
   }
 
   function adjustRotation(deltaDegrees: number) {
-    if (!project) {
+    if (!selectedDevice) {
       return;
     }
 
-    updateProject({
-      ...project,
-      viewRotation: project.viewRotation + deltaDegrees
+    const nextView = { ...deviceView, rotation: deviceView.rotation + deltaDegrees };
+    setDeviceView(nextView);
+    void saveDeviceView(selectedDevice.id, nextView).catch((error) => {
+      setStatus(`Could not save device orientation: ${(error as Error).message}`);
     });
   }
 
   function toggleFlip() {
-    if (!project) {
+    if (!selectedDevice) {
       return;
     }
 
-    updateProject({
-      ...project,
-      viewMirrorX: !project.viewMirrorX,
-      viewMirrorY: false
+    const nextView = {
+      ...deviceView,
+      mirrorX: !deviceView.mirrorX,
+      mirrorY: false
+    };
+    setDeviceView(nextView);
+    void saveDeviceView(selectedDevice.id, nextView).catch((error) => {
+      setStatus(`Could not save device orientation: ${(error as Error).message}`);
     });
   }
 
@@ -1472,6 +1531,12 @@ export function App() {
                         const isSelected = selectedPanels.includes(panel.panelId);
                         const isHovered = hoveredPanelId === panel.panelId;
                         const color = applyBrightness(frameCells[String(panel.panelId)] ?? EMPTY_COLOR);
+                        const labelTransform = getPanelLabelTransform(
+                          panel.orientation,
+                          viewRotation,
+                          viewMirrorX,
+                          viewMirrorY
+                        );
                         return (
                           <g
                             key={panel.panelId}
@@ -1486,7 +1551,7 @@ export function App() {
                               onMouseEnter={() => setHoveredPanelId(panel.panelId)}
                               onMouseLeave={() => setHoveredPanelId((current) => (current === panel.panelId ? null : current))}
                             />
-                            <text className="panel-label" textAnchor="middle" y={4}>
+                            <text className="panel-label" textAnchor="middle" y={4} transform={labelTransform}>
                               {panel.panelId}
                             </text>
                           </g>
