@@ -13,7 +13,7 @@
     "@fastify/cors": "^10.0.2",
     "@fastify/static": "^10.1.2",
     "@nanoleaf-jazz/shared": "*",
-    "fastify": "^5.2.1",
+    "fastify": "^5.12.5",
     "multicast-dns": "^7.2.5",
     "@fastify/rate-limit": "^10.3.0"
   },
